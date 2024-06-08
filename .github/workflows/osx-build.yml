@@ -1,0 +1,90 @@
+name: MacOS Build
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+env:
+  common_build_args: -Ddefault_library=static -Dbuild_osx_bundle=true -Dlocal_boost=true
+
+jobs:
+  build:
+    name: Build-Aegisub-on-macos
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - name: macos-13
+            arch: x86
+          - name: macos-latest
+            arch: arm64
+        build:
+          - name: Debug
+            type: debugoptimized
+          - name: Release
+            type: release
+
+    runs-on: ${{ matrix.os.name }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: '0'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Setup Meson
+        run: |
+          python -m pip install --upgrade pip setuptools
+          pip install meson
+
+      - name: Install dependencies
+        run: |
+          export HOMEBREW_NO_INSTALL_CLEANUP=1
+          export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
+          # Skip brew update for now, see https://github.com/actions/setup-python/issues/577
+          # brew update
+          brew install --quiet --formula boost cmake ffmpeg ffms2 fftw \
+            hunspell libass libiconv icu4c luarocks \
+            meson ninja openal-soft pkg-config \
+            portaudio pulseaudio uchardet wxwidgets zlib
+          luarocks install --local luafilesystem 1.8.0
+          luarocks install --local moonscript --dev
+          luarocks list
+
+      - name: Configure
+        run: |
+          export MACOSX_DEPLOYMENT_TARGET=13
+          export LDFLAGS="-L$(brew --prefix)/opt/libiconv/lib"
+          export CPPFLAGS="-I$(brew --prefix)/opt/libiconv/include"
+          export PKG_CONFIG_PATH="$(brew --prefix)/opt/icu4c/lib/pkgconfig:$(brew --prefix)/opt/openal-soft/lib/pkgconfig"
+          meson setup ${{ env.common_build_args }} -Dbuildtype=${{ matrix.build.type }} build
+
+      - name: Build
+        run: meson compile -C build
+
+      - name: Run test
+        run: meson test -C build --verbose "gtest main"
+
+      # macOS artifacts
+      - name: Generate macOS installer
+        run: |
+          meson compile -C build osx-bundle
+          codesign --sign - --force --deep build/Aegisub.app
+          meson compile -C build osx-build-dmg
+
+      - name: Upload artifacts - macOS dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: MacOS ${{ matrix.build.name }} (${{ matrix.os.arch }}) - installer
+          path: build/Aegisub-*.dmg
+          if-no-files-found: error
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: ${{ matrix.build.type == 'release' }}
+        with:
+          files: build/Aegisub-*.dmg
