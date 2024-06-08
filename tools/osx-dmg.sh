@@ -57,9 +57,9 @@ echo "---- Mounting image ----"
 DEV_NAME=`/usr/bin/hdiutil attach -readwrite -noverify -noautoopen "${DMG_RW_PATH}" |awk '/GUID_partition_scheme/ {print $1}'`
 echo "Device name: ${DEV_NAME}"
 
-echo
-echo "---- Setting bless -openfolder ----"
-bless -openfolder "/Volumes/${PKG_NAME_VOLUME}"
+# echo
+# echo "---- Setting bless -openfolder ----"
+# bless -openfolder "/Volumes/${PKG_NAME_VOLUME}"
 
 echo
 echo "---- Setting root icon using SetFile ----"
