@@ -19,7 +19,14 @@ SRC_DIR="${1}"
 BUILD_DIR="${2}"
 AEGI_VER="${3}"
 
-PKG_NAME="Aegisub-${AEGI_VER}"
+ARCH=$(lipo -archs ${BUILD_DIR}/aegisub)
+if [[ $ARCH == *"x86_64"* && $ARCH == *"arm64"* ]]; then
+      ARCH="universal"
+fi
+
+GIT_VER=$(git rev-parse --short HEAD)
+
+PKG_NAME="Aegisub-${AEGI_VER}-${GIT_VER}-${ARCH}"
 PKG_NAME_VOLUME="${PKG_NAME}"
 
 PKG_DIR="${BUILD_DIR}/Aegisub.app"
